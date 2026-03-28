@@ -1,4 +1,3 @@
-# Пуш в main: тесты → Docker-образ → Docker Hub → деплой по SSH
 name: CI/CD
 
 on:
@@ -34,17 +33,21 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/lab1-app:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/lab1-app:${{ github.sha }}
 
+  # Деплой на машине, где запущен self-hosted runner (без SSH на другой сервер)
   deploy:
     needs: build-push
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
-      - uses: appleboy/ssh-action@v1.2.0
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
         with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
-          script: |
-            docker pull ${{ secrets.DOCKERHUB_USERNAME }}/lab1-app:latest
-            docker stop lab1-app 2>/dev/null || true
-            docker rm lab1-app 2>/dev/null || true
-            docker run -d --name lab1-app -p 80:5000 --restart unless-stopped ${{ secrets.DOCKERHUB_USERNAME }}/lab1-app:latest
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Pull and run container on runner
+        run: |
+          docker pull ${{ secrets.DOCKERHUB_USERNAME }}/lab1-app:latest
+          docker stop lab1-app 2>/dev/null || true
+          docker rm lab1-app 2>/dev/null || true
+          docker run -d --name lab1-app -p 80:5000 --restart unless-stopped ${{ secrets.DOCKERHUB_USERNAME }}/lab1-app:latest
+          docker ps
